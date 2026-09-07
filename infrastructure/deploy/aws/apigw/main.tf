@@ -20,11 +20,18 @@ data "aws_s3_object" "swagger" {
 locals {
   source_openapi = jsondecode(data.aws_s3_object.swagger.body)
   integrated_paths = {
-    for path, path_item in local.source_openapi.paths : path => {
-      for verb, operation in path_item : verb => contains(["get", "put", "post", "delete", "options", "head", "patch"], lower(verb)) ? merge(operation, {
-        "x-amazon-apigateway-integration" = local.lambda_integration
-      }) : operation
-    }
+    for path, path_item in local.source_openapi.paths : path => merge(
+      {
+        for verb, operation in path_item : verb => operation
+        if !contains(["get", "put", "post", "delete", "options", "head", "patch"], lower(verb))
+      },
+      {
+        for verb, operation in path_item : verb => merge(operation, {
+          "x-amazon-apigateway-integration" = local.lambda_integration
+        })
+        if contains(["get", "put", "post", "delete", "options", "head", "patch"], lower(verb))
+      }
+    )
   }
   imported_openapi = merge(local.source_openapi, {
     paths = local.integrated_paths
