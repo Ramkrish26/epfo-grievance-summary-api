@@ -2,12 +2,6 @@ name: Deploy infrastructure - production
 
 on:
   workflow_dispatch:
-    inputs:
-      force_migrations:
-        description: Run all unrecorded database migrations (requires production approval)
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -20,6 +14,5 @@ jobs:
       environment: prd
       region: ap-south-1
       apply: true
-      force_migrations: ${{ inputs.force_migrations }}
     secrets:
       aws_role_arn: ${{ secrets.AWS_PRD_DEPLOY_ROLE_ARN }}

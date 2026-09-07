@@ -13,10 +13,6 @@ on:
         required: false
         default: true
         type: boolean
-      force_migrations:
-        required: false
-        default: false
-        type: boolean
     secrets:
       aws_role_arn:
         required: true
@@ -41,43 +37,6 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
-      - name: Detect new database migrations
-        id: migration-files
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          HEAD_SHA: ${{ github.sha }}
-          FORCE_MIGRATIONS: ${{ inputs.force_migrations }}
-        run: |
-          set -euo pipefail
-          new_scripts=""
-          echo "Force migration requested: ${FORCE_MIGRATIONS}"
-
-          if [[ "${FORCE_MIGRATIONS,,}" == "true" ]]; then
-            new_scripts="$(git ls-tree -r --name-only "${HEAD_SHA}" -- 'database/*.sql')"
-            echo "Migration execution was explicitly requested."
-          elif [[ "${EVENT_NAME}" == "push" ]]; then
-            if [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" =~ ^0+$ ]]; then
-              new_scripts="$(git ls-tree -r --name-only "${HEAD_SHA}" -- 'database/*.sql')"
-            else
-              modified_scripts="$(git diff --name-only --diff-filter=M "${BEFORE_SHA}" "${HEAD_SHA}" -- 'database/*.sql')"
-              if [[ -n "${modified_scripts}" ]]; then
-                echo "Existing database migration scripts must not be edited:"
-                echo "${modified_scripts}"
-                exit 1
-              fi
-              new_scripts="$(git diff --name-only --diff-filter=A "${BEFORE_SHA}" "${HEAD_SHA}" -- 'database/*.sql')"
-            fi
-          fi
-
-          if [[ -n "${new_scripts}" ]]; then
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            echo "New database migrations:"
-            echo "${new_scripts}"
-          else
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            echo "No new database migration files were added."
-          fi
       - name: Read artifact bucket configuration
         id: artifact-bucket
         run: |
@@ -128,12 +87,6 @@ jobs:
             echo "The API Gateway REST API requires an OpenAPI 3.0 document; generated version was '${openapi_version:-missing}'."
             exit 1
           fi
-      - name: Build database migration package
-        if: inputs.apply && steps.migration-files.outputs.should_run == 'true'
-        run: |
-          mkdir -p package/migration/publish
-          dotnet publish src/Epfo.Grievance.Migrations/Epfo.Grievance.Migrations.csproj --configuration Release --no-restore --runtime linux-x64 --self-contained false --output package/migration/publish
-          (cd package/migration/publish && zip -r ../migration.zip .)
       - name: Create Lambda package bucket and upload deployment artifacts
         if: inputs.apply
         working-directory: infrastructure/deploy/aws/lambda
@@ -150,13 +103,6 @@ jobs:
           LAMBDA_PACKAGE_VERSION="$(aws s3api head-object --bucket "${LAMBDA_PACKAGE_BUCKET}" --key "api/${DEPLOY_ENV}/lambda.zip" --query VersionId --output text)"
           echo "LAMBDA_PACKAGE_VERSION=${LAMBDA_PACKAGE_VERSION}" >> "$GITHUB_ENV"
           aws s3 cp "$GITHUB_WORKSPACE/package/swagger.json" "s3://${{ steps.artifact-bucket.outputs.name }}/api/${DEPLOY_ENV}/swagger.json" --content-type application/json
-          if [[ "${{ steps.migration-files.outputs.should_run }}" == "true" ]]; then
-            MIGRATION_S3_KEY="migrations/${DEPLOY_ENV}/${GITHUB_SHA}/migration.zip"
-            aws s3 cp "$GITHUB_WORKSPACE/package/migration/migration.zip" "s3://${LAMBDA_PACKAGE_BUCKET}/${MIGRATION_S3_KEY}"
-            MIGRATION_S3_OBJECT_VERSION="$(aws s3api head-object --bucket "${LAMBDA_PACKAGE_BUCKET}" --key "${MIGRATION_S3_KEY}" --query VersionId --output text)"
-            echo "MIGRATION_S3_KEY=${MIGRATION_S3_KEY}" >> "$GITHUB_ENV"
-            echo "MIGRATION_S3_OBJECT_VERSION=${MIGRATION_S3_OBJECT_VERSION}" >> "$GITHUB_ENV"
-          fi
       - name: Plan environment
         working-directory: infrastructure/deploy/aws
         run: terragrunt run --all --non-interactive --filter '!./static' -- plan
@@ -164,29 +110,3 @@ jobs:
         if: inputs.apply
         working-directory: infrastructure/deploy/aws
         run: terragrunt run --all --non-interactive --filter '!./static' -- apply -auto-approve
-      - name: Run database migrations
-        if: inputs.apply && steps.migration-files.outputs.should_run == 'true'
-        working-directory: infrastructure/deploy/aws/migration
-        env:
-          RUN_DATABASE_MIGRATIONS: "true"
-        run: |
-          set -euo pipefail
-          cleanup() {
-            set +e
-            terragrunt destroy --non-interactive -auto-approve
-            cleanup_status=$?
-            set -e
-            return "${cleanup_status}"
-          }
-          trap 'result=$?; cleanup; cleanup_result=$?; if [[ $result -ne 0 ]]; then exit $result; fi; exit $cleanup_result' EXIT
-
-          terragrunt init --non-interactive -upgrade
-          terragrunt apply --non-interactive -auto-approve
-          function_name="$(terragrunt output --non-interactive -raw function_name)"
-          invoke_metadata="$(aws lambda invoke --function-name "${function_name}" --cli-binary-format raw-in-base64-out --payload "{\"requestedBy\":\"${GITHUB_REPOSITORY}@${GITHUB_SHA}\"}" migration-response.json --output json)"
-          cat migration-response.json
-          function_error="$(jq -r '.FunctionError // empty' <<< "${invoke_metadata}")"
-          if [[ -n "${function_error}" ]]; then
-            echo "Migration Lambda failed: ${function_error}"
-            exit 1
-          fi

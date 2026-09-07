@@ -1,0 +1,123 @@
+name: Run database migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options: [dev, prd]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  migrate:
+    name: Run ${{ inputs.environment }} database migrations
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: epfo-database-migrations-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      AWS_REGION: ap-south-1
+      DEPLOY_ENV: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Validate database migration files
+        run: |
+          set -euo pipefail
+          mapfile -t scripts < <(git ls-files -- 'database/*.sql' | sort)
+          if [[ "${#scripts[@]}" -eq 0 ]]; then
+            echo "No database migration scripts were found."
+            exit 1
+          fi
+
+          for script in "${scripts[@]}"; do
+            file_name="${script##*/}"
+            if [[ ! "${file_name}" =~ ^[0-9]+_[A-Za-z0-9][A-Za-z0-9_-]*\.sql$ ]]; then
+              echo "Invalid migration filename: ${script}. Use a numeric prefix, for example 006_AddFeature.sql."
+              exit 1
+            fi
+          done
+
+          duplicate_prefixes="$(printf '%s\n' "${scripts[@]##*/}" | cut -d_ -f1 | sort | uniq -d)"
+          if [[ -n "${duplicate_prefixes}" ]]; then
+            echo "Migration number(s) must be unique: ${duplicate_prefixes}"
+            exit 1
+          fi
+
+          printf 'Migration scripts to validate against the database:\n%s\n' "$(printf '%s\n' "${scripts[@]}")"
+      - name: Configure target-account credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ inputs.environment == 'prd' && secrets.AWS_PRD_DEPLOY_ROLE_ARN || secrets.AWS_DEV_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: epfo-db-migrations-${{ inputs.environment }}
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.16.1
+          terraform_wrapper: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - name: Install Terragrunt
+        run: |
+          curl --fail --location --silent --show-error --output /usr/local/bin/terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v1.1.4/terragrunt_linux_amd64
+          chmod +x /usr/local/bin/terragrunt
+          terragrunt --version
+      - name: Build database migration package
+        run: |
+          set -euo pipefail
+          dotnet restore Epfo.Grievance.sln --runtime linux-x64
+          dotnet test Epfo.Grievance.sln --no-restore --configuration Release
+          rm -rf package/migration
+          mkdir -p package/migration/publish
+          dotnet publish src/Epfo.Grievance.Migrations/Epfo.Grievance.Migrations.csproj --configuration Release --no-restore --runtime linux-x64 --self-contained false --output package/migration/publish
+          (cd package/migration/publish && zip -r ../migration.zip .)
+      - name: Upload migration package
+        working-directory: infrastructure/deploy/aws/lambda
+        run: |
+          set -euo pipefail
+          terragrunt init --non-interactive -upgrade
+          terragrunt apply --non-interactive -auto-approve \
+            --target=aws_s3_bucket.packages \
+            --target=aws_s3_bucket_versioning.packages \
+            --target=aws_s3_bucket_server_side_encryption_configuration.packages \
+            --target=aws_s3_bucket_public_access_block.packages \
+            --target=aws_s3_bucket_policy.packages_tls
+          package_bucket="$(terragrunt output --non-interactive -raw package_bucket_name)"
+          migration_key="migrations/${DEPLOY_ENV}/${GITHUB_SHA}/migration.zip"
+          aws s3 cp "$GITHUB_WORKSPACE/package/migration/migration.zip" "s3://${package_bucket}/${migration_key}"
+          migration_version="$(aws s3api head-object --bucket "${package_bucket}" --key "${migration_key}" --query VersionId --output text)"
+          echo "MIGRATION_S3_KEY=${migration_key}" >> "$GITHUB_ENV"
+          echo "MIGRATION_S3_OBJECT_VERSION=${migration_version}" >> "$GITHUB_ENV"
+      - name: Run database migrations
+        working-directory: infrastructure/deploy/aws/migration
+        env:
+          RUN_DATABASE_MIGRATIONS: "true"
+        run: |
+          set -euo pipefail
+          cleanup() {
+            set +e
+            terragrunt destroy --non-interactive -auto-approve
+            cleanup_status=$?
+            set -e
+            return "${cleanup_status}"
+          }
+          trap 'result=$?; cleanup; cleanup_result=$?; if [[ $result -ne 0 ]]; then exit $result; fi; exit $cleanup_result' EXIT
+
+          terragrunt init --non-interactive -upgrade
+          terragrunt apply --non-interactive -auto-approve
+          function_name="$(terragrunt output --non-interactive -raw function_name)"
+          invoke_metadata="$(aws lambda invoke --function-name "${function_name}" --cli-binary-format raw-in-base64-out --payload "{\"requestedBy\":\"${GITHUB_REPOSITORY}@${GITHUB_SHA}\"}" migration-response.json --output json)"
+          cat migration-response.json
+          function_error="$(jq -r '.FunctionError // empty' <<< "${invoke_metadata}")"
+          if [[ -n "${function_error}" ]]; then
+            echo "Migration Lambda failed: ${function_error}"
+            exit 1
+          fi

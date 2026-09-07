@@ -10,6 +10,34 @@ locals {
     uri                 = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${var.lambda_arn}/invocations"
     passthroughBehavior = "when_no_match"
   }
+  cors_operation = {
+    responses = {
+      "200" = {
+        description = "CORS response"
+        headers = {
+          "Access-Control-Allow-Headers" = { schema = { type = "string" } }
+          "Access-Control-Allow-Methods" = { schema = { type = "string" } }
+          "Access-Control-Allow-Origin"  = { schema = { type = "string" } }
+        }
+      }
+    }
+    "x-amazon-apigateway-integration" = {
+      type = "mock"
+      requestTemplates = {
+        "application/json" = "{\"statusCode\": 200}"
+      }
+      responses = {
+        default = {
+          statusCode = "200"
+          responseParameters = {
+            "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+            "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD'"
+            "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allowed_origin}'"
+          }
+        }
+      }
+    }
+  }
 }
 
 data "aws_s3_object" "swagger" {
@@ -30,14 +58,12 @@ locals {
           "x-amazon-apigateway-integration" = local.lambda_integration
         })
         if contains(["get", "put", "post", "delete", "options", "head", "patch"], lower(verb))
-      }
+      },
+      { options = local.cors_operation }
     )
   }
   imported_openapi = merge(local.source_openapi, {
     paths = local.integrated_paths
-    "x-amazon-apigateway-endpoint-configuration" = {
-      vpcEndpointIds = [var.execute_api_vpc_endpoint_id]
-    }
   })
 }
 
@@ -48,35 +74,13 @@ resource "aws_api_gateway_rest_api" "this" {
   put_rest_api_mode = "merge"
 
   endpoint_configuration {
-    types            = ["PRIVATE"]
-    vpc_endpoint_ids = [var.execute_api_vpc_endpoint_id]
+    types = ["REGIONAL"]
   }
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect    = "Deny"
-        Principal = "*"
-        Action    = "execute-api:Invoke"
-        Resource  = "execute-api:/*"
-        Condition = {
-          StringNotEquals = { "aws:SourceVpce" = var.execute_api_vpc_endpoint_id }
-        }
-      },
-      {
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "execute-api:Invoke"
-        Resource  = "execute-api:/*"
-      }
-    ]
-  })
   tags = local.tags
 }
 
 resource "aws_lambda_permission" "api_gateway" {
-  statement_id  = "AllowPrivateApiGatewayInvoke"
+  statement_id  = "AllowRegionalApiGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = var.lambda_function_name
   principal     = "apigateway.amazonaws.com"

@@ -28,11 +28,12 @@ script causes a failure; add a new, higher-numbered file instead.
 versioned scripts. Edit its placeholders before dispatching the initial
 migration run when creating the first Super Admin.
 
-The migration Lambda is created only when a new `database/*.sql` file is added
-to a push. It is invoked after RDS is ready and destroyed after either a
-successful or failed run. For the initial rollout, use the `force_migrations`
-input when manually dispatching the dev or production deployment workflow; it
-runs every unrecorded version while retaining the same ledger and hash checks.
+Use the manually triggered **Run database migrations** workflow after the
+infrastructure deployment has completed. It packages every versioned script,
+creates the migration Lambda after RDS is ready, and destroys the Lambda after
+either a successful or failed run. The migration ledger and SHA-256 hash check
+mean previously applied scripts are skipped, while a changed applied script
+causes the workflow to fail. There is no force-migration option.
 
 For an existing database created before the role and feature updates, run these
 idempotent migrations in order:
