@@ -20,7 +20,7 @@ public static class DependencyInjection
             throw new InvalidOperationException("Jwt:Key must contain at least 32 bytes for HS256. Configure it using user secrets or the Jwt__Key environment variable.");
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
         {
-            options.TokenValidationParameters = new() { ValidateIssuer=true, ValidateAudience=true, ValidateLifetime=true, ValidateIssuerSigningKey=true, ClockSkew=TimeSpan.Zero, ValidIssuer=configuration["Jwt:Issuer"], ValidAudience=configuration["Jwt:Audience"], IssuerSigningKey=new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)) };
+            options.TokenValidationParameters = new() { ValidateIssuer=true, ValidateAudience=true, ValidateLifetime=true, ValidateIssuerSigningKey=true, ClockSkew=TimeSpan.Zero, ValidIssuer=configuration["Jwt:Issuer"] ?? "Epfo.Grievance.Api", ValidAudience=configuration["Jwt:Audience"] ?? "Epfo.Grievance.Ui", IssuerSigningKey=new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)) };
             options.Events = new JwtBearerEvents
             {
                 OnChallenge = async context => { context.HandleResponse(); context.Response.StatusCode=StatusCodes.Status401Unauthorized; context.Response.ContentType="application/json"; await context.Response.WriteAsync(JsonSerializer.Serialize(new { message="Your session has expired. Please sign in again." })); },

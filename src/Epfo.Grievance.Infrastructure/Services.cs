@@ -42,9 +42,11 @@ public sealed class AuthService(EpfoDbContext db, IConfiguration configuration, 
     {
         var key = configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key is not configured.");
         if (Encoding.UTF8.GetByteCount(key) < 32) throw new InvalidOperationException("Jwt:Key must contain at least 32 bytes for HS256.");
+        var issuer = configuration["Jwt:Issuer"] ?? "Epfo.Grievance.Api";
+        var audience = configuration["Jwt:Audience"] ?? "Epfo.Grievance.Ui";
         var expiry = DateTime.UtcNow.AddHours(1);
         var identity = new ClaimsIdentity([new(ClaimTypes.NameIdentifier, user.UserId.ToString()), new(ClaimTypes.Name, user.Username), new("office_id", office.OfficeId.ToString()), new("office_code", office.OfficeCode), .. roles.Select(x => new Claim(ClaimTypes.Role, x))]);
-        var token = new JwtSecurityToken(claims: identity.Claims, expires: expiry, issuer: configuration["Jwt:Issuer"], audience: configuration["Jwt:Audience"], signingCredentials: new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)), SecurityAlgorithms.HmacSha256));
+        var token = new JwtSecurityToken(claims: identity.Claims, expires: expiry, issuer: issuer, audience: audience, signingCredentials: new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)), SecurityAlgorithms.HmacSha256));
         return new(new JwtSecurityTokenHandler().WriteToken(token), expiry, user.Username, user.DisplayName, office.OfficeCode, office.OfficeName, roles);
     }
 }

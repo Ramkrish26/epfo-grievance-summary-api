@@ -141,6 +141,8 @@ resource "aws_lambda_function" "this" {
       Database__Port         = tostring(var.db_port)
       Database__Name         = var.db_name
       Jwt__SecretArn         = aws_secretsmanager_secret.jwt_signing_key.arn
+      Jwt__Issuer            = "Epfo.Grievance.Api"
+      Jwt__Audience          = "Epfo.Grievance.Ui"
       }, {
       for index, origin in var.cors_allowed_origins : "Cors__AllowedOrigins__${index}" => origin
     })
