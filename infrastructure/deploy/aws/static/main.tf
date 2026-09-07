@@ -9,6 +9,8 @@ resource "aws_iam_openid_connect_provider" "github" {
 
 locals {
   github_oidc_provider_arn = coalesce(var.github_oidc_provider_arn, one(aws_iam_openid_connect_provider.github[*].arn))
+  github_repository_parts  = split("/", var.github_repository)
+  github_oidc_subject      = "repo:${local.github_repository_parts[0]}@${var.github_owner_id}/${local.github_repository_parts[1]}@${var.github_repository_id}:environment:${var.environment}"
 }
 
 data "aws_iam_policy_document" "github_oidc_assume_role" {
@@ -24,9 +26,9 @@ data "aws_iam_policy_document" "github_oidc_assume_role" {
       values   = ["sts.amazonaws.com"]
     }
     condition {
-      test     = "StringLike"
+      test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:*"]
+      values   = [local.github_oidc_subject]
     }
   }
 }

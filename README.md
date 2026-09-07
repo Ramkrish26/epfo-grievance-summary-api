@@ -65,6 +65,6 @@ generates `package/swagger.json` from `/openapi/v1.json`. The Lambda ZIP is
 uploaded to the Lambda-owned package bucket. The OpenAPI document is uploaded
 to the static artifact bucket configured once in the environment file:
 `epfo-grievance-summary-dev-artifacts` for development and
-`epfo-grievance-summary-prd-artifacts` for production. Terraform and both
-packaging workflows read the same configuration; no `EPFO_ARTIFACT_BUCKET`
+`epfo-grievance-summary-prd-artifacts` for production. Terraform and the
+reusable deployment workflow read the same configuration; no `EPFO_ARTIFACT_BUCKET`
 environment variable is required.

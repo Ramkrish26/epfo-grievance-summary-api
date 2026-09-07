@@ -6,6 +6,10 @@ on:
     paths: ["infrastructure/**", ".github/workflows/**", "src/**", "Epfo.Grievance.sln"]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   deploy:
     uses: ./.github/workflows/infrastructure-deploy-template.yml

@@ -13,13 +13,27 @@ It replaces the legacy MySQL database split with a normalized case model. The le
 | Compliance | `Cases`, `ComplianceDockets` |
 | Login and roles | `Users`, `Roles`, `UserRoles`, `PasswordResetTokens` |
 
-Run the script in SQL Server Management Studio or Azure Data Studio using an account that can create databases. It creates no user account and stores no credentials.
+The deployment pipeline runs versioned scripts from a short-lived migration
+Lambda inside the VPC. It uses the RDS-managed master secret and does not put
+database credentials in GitHub or Terraform configuration.
 
 ## Script order
 
-For a new database, run the scripts in numeric order. Edit the placeholders in
-`004_SeedInitialSuperAdmin.sql` before running it; this is the only supported way
-to create the first Super Admin.
+For a new database, the pipeline applies the scripts in numeric order and stores
+each filename and SHA-256 hash in `dbo.__EpfoSchemaMigrations`. A script that is
+already recorded with the same hash is skipped. Changing an already-recorded
+script causes a failure; add a new, higher-numbered file instead.
+
+`004_SeedInitialSuperAdmin.sql` is run by the migration pipeline like the other
+versioned scripts. Edit its placeholders before dispatching the initial
+migration run when creating the first Super Admin.
+
+Use the manually triggered **Run database migrations** workflow after the
+infrastructure deployment has completed. It packages every versioned script,
+creates the migration Lambda after RDS is ready, and destroys the Lambda after
+either a successful or failed run. The migration ledger and SHA-256 hash check
+mean previously applied scripts are skipped, while a changed applied script
+causes the workflow to fail. There is no force-migration option.
 
 For an existing database created before the role and feature updates, run these
 idempotent migrations in order:

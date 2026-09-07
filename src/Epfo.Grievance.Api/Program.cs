@@ -3,6 +3,7 @@ using Amazon.Lambda.AspNetCoreServer;
 using Amazon.Lambda.AspNetCoreServer.Hosting;
 using Amazon.SecretsManager;
 using Amazon.SecretsManager.Model;
+using Microsoft.OpenApi;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,7 +22,9 @@ if (!string.IsNullOrWhiteSpace(databaseSecretArn))
     builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:EpfoGrievance"] = $"Server={endpoint},{port};Database={databaseName};User Id={username};Password={password};Encrypt=True;TrustServerCertificate=False" });
 }
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
+// API Gateway REST API imports OpenAPI 3.0 (not the .NET default OpenAPI 3.1 output).
+// Keep the generated contract compatible with the API Gateway importer used by CI/CD.
+builder.Services.AddOpenApi(options => options.OpenApiVersion = OpenApiSpecVersion.OpenApi3_0);
 builder.Services.AddAWSLambdaHosting(LambdaEventSource.RestApi);
 builder.Services.AddAuthorization(options => options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder().RequireAuthenticatedUser().RequireClaim("office_id").Build());
 builder.Services.AddEpfoServices(builder.Configuration);

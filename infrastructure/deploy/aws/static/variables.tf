@@ -8,6 +8,8 @@ variable "state_bucket_name" { type = string }
 variable "artifact_bucket_name" { type = string }
 variable "lock_table_name" { type = string }
 variable "github_repository" { type = string }
+variable "github_owner_id" { type = string }
+variable "github_repository_id" { type = string }
 variable "github_branch" { type = string }
 variable "github_oidc_provider_arn" {
   type     = string

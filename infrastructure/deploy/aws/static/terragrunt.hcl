@@ -13,12 +13,15 @@ locals {
 terraform { source = "." }
 
 inputs = {
-  aws_region           = local.values.aws_region
-  environment          = local.environment
-  project              = local.values.project
-  state_bucket_name    = local.values.tf_state_bucket_name
-  artifact_bucket_name = local.values.artifact_bucket_name
-  lock_table_name      = local.values.tf_lock_table_name
-  github_repository    = get_env("EPFO_GITHUB_REPOSITORY")
-  github_branch        = local.values.github_branch
+  aws_region               = local.values.aws_region
+  environment              = local.environment
+  project                  = local.values.project
+  state_bucket_name        = local.values.tf_state_bucket_name
+  artifact_bucket_name     = local.values.artifact_bucket_name
+  lock_table_name          = local.values.tf_lock_table_name
+  github_repository        = get_env("EPFO_GITHUB_REPOSITORY")
+  github_owner_id          = local.values.github_owner_id
+  github_repository_id     = local.values.github_repository_id
+  github_branch            = local.values.github_branch
+  github_oidc_provider_arn = try(local.values.github_oidc_provider_arn, null)
 }
