@@ -114,10 +114,18 @@ jobs:
           terragrunt init --non-interactive -upgrade
           terragrunt apply --non-interactive -auto-approve
           function_name="$(terragrunt output --non-interactive -raw function_name)"
-          invoke_metadata="$(aws lambda invoke --function-name "${function_name}" --cli-binary-format raw-in-base64-out --payload "{\"requestedBy\":\"${GITHUB_REPOSITORY}@${GITHUB_SHA}\"}" migration-response.json --output json)"
+          invoke_metadata="$(aws lambda invoke --function-name "${function_name}" --cli-binary-format raw-in-base64-out --log-type Tail --payload "{\"requestedBy\":\"${GITHUB_REPOSITORY}@${GITHUB_SHA}\"}" migration-response.json --output json)"
           cat migration-response.json
           function_error="$(jq -r '.FunctionError // empty' <<< "${invoke_metadata}")"
           if [[ -n "${function_error}" ]]; then
             echo "Migration Lambda failed: ${function_error}"
+            log_result="$(jq -r '.LogResult // empty' <<< "${invoke_metadata}")"
+            if [[ -n "${log_result}" ]]; then
+              echo "Lambda execution log tail:"
+              printf '%s' "${log_result}" | base64 --decode || true
+            fi
+            sleep 5
+            echo "CloudWatch log tail:"
+            aws logs tail "/aws/lambda/${function_name}" --since 5m --format short || true
             exit 1
           fi
