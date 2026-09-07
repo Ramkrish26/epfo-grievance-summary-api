@@ -28,5 +28,6 @@ inputs = {
   lambda_arn                  = dependency.lambda.outputs.lambda_arn
   lambda_invoke_arn           = dependency.lambda.outputs.lambda_invoke_arn
   lambda_function_name        = dependency.lambda.outputs.lambda_function_name
+  deployment_trigger          = "${get_env("GITHUB_RUN_ID", "local")}-${get_env("GITHUB_RUN_ATTEMPT", "0")}"
   tags                        = local.values.tags
 }

@@ -10,6 +10,7 @@ variable "swagger_s3_key" { type = string }
 variable "lambda_arn" { type = string }
 variable "lambda_invoke_arn" { type = string }
 variable "lambda_function_name" { type = string }
+variable "deployment_trigger" { type = string }
 variable "tags" {
   type    = map(string)
   default = {}

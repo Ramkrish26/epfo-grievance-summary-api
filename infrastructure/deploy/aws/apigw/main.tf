@@ -106,12 +106,15 @@ resource "aws_lambda_permission" "api_gateway" {
 resource "aws_api_gateway_deployment" "this" {
   rest_api_id = aws_api_gateway_rest_api.this.id
   triggers = {
-    redeployment = sha1(jsonencode(local.imported_openapi))
+    redeployment = sha1(jsonencode({
+      openapi  = local.imported_openapi
+      pipeline = var.deployment_trigger
+    }))
   }
   lifecycle {
     create_before_destroy = true
   }
-  depends_on = [aws_lambda_permission.api_gateway]
+  depends_on = [aws_lambda_permission.api_gateway, aws_api_gateway_rest_api_policy.public]
 }
 
 resource "aws_api_gateway_stage" "this" {
