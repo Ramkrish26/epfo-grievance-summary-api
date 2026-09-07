@@ -94,7 +94,13 @@ public sealed class Function
         await connection.OpenAsync();
         await using var command = connection.CreateCommand();
         command.CommandTimeout = 300;
-        command.CommandText = "IF DB_ID(@databaseName) IS NULL EXEC(N'CREATE DATABASE ' + QUOTENAME(@databaseName));";
+        command.CommandText = """
+            IF DB_ID(@databaseName) IS NULL
+            BEGIN
+                DECLARE @createDatabaseSql NVARCHAR(512) = N'CREATE DATABASE ' + QUOTENAME(@databaseName);
+                EXEC sys.sp_executesql @createDatabaseSql;
+            END;
+            """;
         command.Parameters.AddWithValue("@databaseName", databaseName);
         await command.ExecuteNonQueryAsync();
     }

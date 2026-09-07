@@ -103,44 +103,6 @@ jobs:
           LAMBDA_PACKAGE_VERSION="$(aws s3api head-object --bucket "${LAMBDA_PACKAGE_BUCKET}" --key "api/${DEPLOY_ENV}/lambda.zip" --query VersionId --output text)"
           echo "LAMBDA_PACKAGE_VERSION=${LAMBDA_PACKAGE_VERSION}" >> "$GITHUB_ENV"
           aws s3 cp "$GITHUB_WORKSPACE/package/swagger.json" "s3://${{ steps.artifact-bucket.outputs.name }}/api/${DEPLOY_ENV}/swagger.json" --content-type application/json
-      - name: Migrate existing private API Gateway to regional
-        if: inputs.apply
-        run: |
-          set -euo pipefail
-          api_name="$(jq -r '.api_name' "infrastructure/deploy/aws/env/${DEPLOY_ENV}/${DEPLOY_ENV}.tfvars.json")"
-          api_id="$(aws apigateway get-rest-apis --region "${AWS_REGION}" --output json | jq -r --arg name "${api_name}" '.items[] | select(.name == $name) | .id' | head -n 1)"
-
-          if [[ -z "${api_id}" || "${api_id}" == "null" ]]; then
-            echo "No existing API Gateway named '${api_name}' was found; Terraform will create it as regional."
-            exit 0
-          fi
-
-          endpoint_type="$(aws apigateway get-rest-api --region "${AWS_REGION}" --rest-api-id "${api_id}" --query 'endpointConfiguration.types[0]' --output text)"
-          if [[ "${endpoint_type}" != "PRIVATE" ]]; then
-            echo "API Gateway '${api_id}' already uses the ${endpoint_type} endpoint type."
-            exit 0
-          fi
-
-          echo "Converting API Gateway '${api_id}' from PRIVATE to REGIONAL."
-          aws apigateway update-rest-api \
-            --region "${AWS_REGION}" \
-            --rest-api-id "${api_id}" \
-            --patch-operations op=replace,path=/endpointConfiguration/types/PRIVATE,value=REGIONAL
-
-          for attempt in {1..20}; do
-            endpoint_type="$(aws apigateway get-rest-api --region "${AWS_REGION}" --rest-api-id "${api_id}" --query 'endpointConfiguration.types[0]' --output text)"
-            [[ "${endpoint_type}" == "REGIONAL" ]] && break
-            sleep 3
-          done
-          [[ "${endpoint_type}" == "REGIONAL" ]] || { echo "API Gateway endpoint conversion did not complete."; exit 1; }
-
-          policy="$(aws apigateway get-rest-api --region "${AWS_REGION}" --rest-api-id "${api_id}" --query 'policy' --output text)"
-          if [[ -n "${policy}" && "${policy}" != "None" ]]; then
-            aws apigateway update-rest-api \
-              --region "${AWS_REGION}" \
-              --rest-api-id "${api_id}" \
-              --patch-operations op=remove,path=/policy
-          fi
       - name: Plan environment
         working-directory: infrastructure/deploy/aws
         run: terragrunt run --all --non-interactive --filter '!./static' -- plan
