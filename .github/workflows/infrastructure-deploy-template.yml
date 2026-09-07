@@ -77,6 +77,7 @@ jobs:
         env:
           ASPNETCORE_URLS: http://127.0.0.1:5080
           ASPNETCORE_ENVIRONMENT: Development
+          Jwt__Key: epfo-ci-openapi-generation-key-do-not-use-for-auth
         run: |
           dotnet package/publish/Epfo.Grievance.Api.dll > package/api.log 2>&1 &
           for attempt in {1..20}; do curl --fail --silent http://127.0.0.1:5080/openapi/v1.json -o package/swagger.json && break; sleep 1; done
