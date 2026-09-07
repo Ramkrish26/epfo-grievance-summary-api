@@ -40,6 +40,7 @@ idempotent migrations in order:
 
 1. `003_AddAdminRole.sql`
 2. `005_FeatureCompletion.sql`
+3. `006_AddRoyapettahAndAmbatturOffices.sql`
 
 `005_FeatureCompletion.sql` adds the APFC review case type and improves the
 office/type/status query index. It intentionally preserves existing office

@@ -7,6 +7,9 @@ using Microsoft.OpenApi;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
+// Keep operational warnings/errors, but do not emit database statements or query
+// metadata to CloudWatch.
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
 var databaseSecretArn = builder.Configuration["Database:SecretArn"];
 var jwtSecretArn = builder.Configuration["Jwt:SecretArn"];
 if (!string.IsNullOrWhiteSpace(databaseSecretArn))
