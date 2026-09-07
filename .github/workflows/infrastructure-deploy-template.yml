@@ -83,7 +83,7 @@ jobs:
         run: |
           rm -rf package
           mkdir -p package/publish
-          dotnet restore Epfo.Grievance.sln
+          dotnet restore Epfo.Grievance.sln --runtime linux-x64
           dotnet test Epfo.Grievance.sln --no-restore --configuration Release
           dotnet publish src/Epfo.Grievance.Api/Epfo.Grievance.Api.csproj --configuration Release --no-restore --runtime linux-x64 --self-contained false --output package/publish
           (cd package/publish && zip -r ../lambda.zip .)

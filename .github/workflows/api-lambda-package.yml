@@ -33,7 +33,7 @@ jobs:
           role-session-name: epfo-api-package-${{ inputs.environment }}
       - name: Restore, test, and publish Lambda package
         run: |
-          dotnet restore Epfo.Grievance.sln
+          dotnet restore Epfo.Grievance.sln --runtime linux-x64
           dotnet test Epfo.Grievance.sln --no-restore --configuration Release
           rm -rf package
           mkdir -p package/publish
