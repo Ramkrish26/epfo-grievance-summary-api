@@ -10,6 +10,24 @@ locals {
 
 data "aws_caller_identity" "current" {}
 
+resource "random_password" "jwt_signing_key" {
+  length           = 64
+  special          = true
+  override_special = "_-"
+}
+
+resource "aws_secretsmanager_secret" "jwt_signing_key" {
+  name                    = "${local.name}-jwt-signing-key"
+  description             = "JWT signing key for the ${local.name} Lambda API"
+  recovery_window_in_days = 7
+  tags                    = local.tags
+}
+
+resource "aws_secretsmanager_secret_version" "jwt_signing_key" {
+  secret_id     = aws_secretsmanager_secret.jwt_signing_key.id
+  secret_string = random_password.jwt_signing_key.result
+}
+
 resource "aws_s3_bucket" "packages" {
   bucket        = local.package_bucket_name
   force_destroy = false
@@ -84,7 +102,7 @@ resource "aws_iam_role_policy" "secret" {
     Statement = [{
       Effect   = "Allow"
       Action   = ["secretsmanager:GetSecretValue"]
-      Resource = var.db_secret_arn
+      Resource = [var.db_secret_arn, aws_secretsmanager_secret.jwt_signing_key.arn]
     }]
   })
 }
@@ -122,11 +140,12 @@ resource "aws_lambda_function" "this" {
       Database__Endpoint     = var.db_endpoint
       Database__Port         = tostring(var.db_port)
       Database__Name         = var.db_name
+      Jwt__SecretArn         = aws_secretsmanager_secret.jwt_signing_key.arn
       }, {
       for index, origin in var.cors_allowed_origins : "Cors__AllowedOrigins__${index}" => origin
     })
   }
 
-  depends_on = [aws_cloudwatch_log_group.this]
+  depends_on = [aws_cloudwatch_log_group.this, aws_secretsmanager_secret_version.jwt_signing_key]
   tags       = local.tags
 }
