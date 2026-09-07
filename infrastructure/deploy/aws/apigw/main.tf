@@ -79,6 +79,22 @@ resource "aws_api_gateway_rest_api" "this" {
   tags = local.tags
 }
 
+# Replaces the legacy VPC-endpoint deny policy so browser clients can reach
+# this environment's regional gateway. Application endpoints remain protected
+# by the Lambda's JWT and office-level authorization.
+resource "aws_api_gateway_rest_api_policy" "public" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = "*"
+      Action    = "execute-api:Invoke"
+      Resource  = "execute-api:/${var.environment}/*/*"
+    }]
+  })
+}
+
 resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowRegionalApiGatewayInvoke"
   action        = "lambda:InvokeFunction"
