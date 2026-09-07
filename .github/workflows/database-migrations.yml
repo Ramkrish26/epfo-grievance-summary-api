@@ -78,7 +78,9 @@ jobs:
           rm -rf package/migration
           mkdir -p package/migration/publish
           dotnet publish src/Epfo.Grievance.Migrations/Epfo.Grievance.Migrations.csproj --configuration Release --no-restore --runtime linux-x64 --self-contained false --output package/migration/publish
+          test -f package/migration/publish/Epfo.Grievance.Migrations.runtimeconfig.json
           (cd package/migration/publish && zip -r ../migration.zip .)
+          unzip -Z1 package/migration/migration.zip | grep -Fx 'Epfo.Grievance.Migrations.runtimeconfig.json'
       - name: Upload migration package
         working-directory: infrastructure/deploy/aws/lambda
         run: |
