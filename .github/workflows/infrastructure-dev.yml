@@ -23,6 +23,6 @@ jobs:
       environment: dev
       region: ap-south-1
       apply: true
-      force_migrations: ${{ github.event_name == 'workflow_dispatch' && inputs.force_migrations || false }}
+      force_migrations: ${{ inputs.force_migrations }}
     secrets:
       aws_role_arn: ${{ secrets.AWS_DEV_DEPLOY_ROLE_ARN }}

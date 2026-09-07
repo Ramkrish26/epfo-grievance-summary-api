@@ -51,8 +51,9 @@ jobs:
         run: |
           set -euo pipefail
           new_scripts=""
+          echo "Force migration requested: ${FORCE_MIGRATIONS}"
 
-          if [[ "${FORCE_MIGRATIONS}" == "true" ]]; then
+          if [[ "${FORCE_MIGRATIONS,,}" == "true" ]]; then
             new_scripts="$(git ls-tree -r --name-only "${HEAD_SHA}" -- 'database/*.sql')"
             echo "Migration execution was explicitly requested."
           elif [[ "${EVENT_NAME}" == "push" ]]; then
@@ -101,10 +102,6 @@ jobs:
           curl --fail --location --silent --show-error --output /usr/local/bin/terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v1.1.4/terragrunt_linux_amd64
           chmod +x /usr/local/bin/terragrunt
           terragrunt --version
-      - name: Deploy VPC and database prerequisites
-        if: inputs.apply
-        working-directory: infrastructure/deploy/aws
-        run: terragrunt run --all --non-interactive --filter '!./static' --filter '!./lambda' --filter '!./migration' --filter '!./apigw' -- apply -auto-approve
       - name: Build .NET Lambda package
         if: inputs.apply
         run: |
@@ -124,6 +121,13 @@ jobs:
           dotnet package/publish/Epfo.Grievance.Api.dll > package/api.log 2>&1 &
           for attempt in {1..20}; do curl --fail --silent http://127.0.0.1:5080/openapi/v1.json -o package/swagger.json && break; sleep 1; done
           test -s package/swagger.json
+          jq '.openapi = "3.0.0" | del(.servers)' package/swagger.json > package/swagger.normalized.json
+          mv package/swagger.normalized.json package/swagger.json
+          openapi_version="$(jq -r '.openapi // empty' package/swagger.json)"
+          if [[ "${openapi_version}" != "3.0.0" ]]; then
+            echo "The API Gateway REST API requires an OpenAPI 3.0 document; generated version was '${openapi_version:-missing}'."
+            exit 1
+          fi
       - name: Build database migration package
         if: inputs.apply && steps.migration-files.outputs.should_run == 'true'
         run: |
@@ -153,6 +157,13 @@ jobs:
             echo "MIGRATION_S3_KEY=${MIGRATION_S3_KEY}" >> "$GITHUB_ENV"
             echo "MIGRATION_S3_OBJECT_VERSION=${MIGRATION_S3_OBJECT_VERSION}" >> "$GITHUB_ENV"
           fi
+      - name: Plan environment
+        working-directory: infrastructure/deploy/aws
+        run: terragrunt run --all --non-interactive --filter '!./static' -- plan
+      - name: Apply environment
+        if: inputs.apply
+        working-directory: infrastructure/deploy/aws
+        run: terragrunt run --all --non-interactive --filter '!./static' -- apply -auto-approve
       - name: Run database migrations
         if: inputs.apply && steps.migration-files.outputs.should_run == 'true'
         working-directory: infrastructure/deploy/aws/migration
@@ -179,10 +190,3 @@ jobs:
             echo "Migration Lambda failed: ${function_error}"
             exit 1
           fi
-      - name: Plan environment
-        working-directory: infrastructure/deploy/aws
-        run: terragrunt run --all --non-interactive --filter '!./static' -- plan
-      - name: Apply environment
-        if: inputs.apply
-        working-directory: infrastructure/deploy/aws
-        run: terragrunt run --all --non-interactive --filter '!./static' -- apply -auto-approve
