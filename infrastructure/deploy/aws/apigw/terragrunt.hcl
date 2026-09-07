@@ -16,6 +16,7 @@ dependency "vpc" {
 dependency "lambda" {
   config_path                             = "../lambda"
   mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+  mock_outputs_merge_strategy_with_state  = "shallow"
   mock_outputs = {
     lambda_arn           = "arn:aws:lambda:ap-south-1:000000000000:function:placeholder"
     lambda_invoke_arn    = "arn:aws:apigateway:ap-south-1:lambda:path/2015-03-31/functions/placeholder/invocations"
