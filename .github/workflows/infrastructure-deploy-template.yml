@@ -59,9 +59,6 @@ jobs:
           curl --fail --location --silent --show-error --output /usr/local/bin/terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v0.68.14/terragrunt_linux_amd64
           chmod +x /usr/local/bin/terragrunt
           terragrunt --version
-      - name: Bootstrap remote state, artifact bucket, and target-account deployment role
-        working-directory: infrastructure/deploy/aws/static
-        run: terragrunt --terragrunt-non-interactive init && terragrunt --terragrunt-non-interactive apply --auto-approve
       - name: Deploy VPC and database prerequisites
         if: inputs.apply
         working-directory: infrastructure/deploy/aws

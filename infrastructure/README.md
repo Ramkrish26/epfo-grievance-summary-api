@@ -82,12 +82,11 @@ configured before use.
 After the one-time bootstrap, the reusable deployment workflow performs the
 following for the selected environment:
 
-1. Applies the static state, artifact-bucket, and deployment-role resources.
-2. Deploys the VPC and RDS prerequisites.
-3. Creates the Lambda package bucket.
-4. Restores, tests, and publishes the .NET 10 API for `linux-x64`.
-5. Uploads `lambda.zip` and the generated OpenAPI document.
-6. Plans and applies the remaining Lambda and API Gateway resources.
+1. Deploys the VPC and RDS prerequisites.
+2. Creates the Lambda package bucket.
+3. Restores, tests, and publishes the .NET 10 API for `linux-x64`.
+4. Uploads `lambda.zip` and the generated OpenAPI document.
+5. Plans and applies the remaining Lambda and API Gateway resources.
 
 The dev workflow runs automatically for changes to `infrastructure/`, `.github/workflows/`,
 `src/`, or `Epfo.Grievance.sln`. The production workflow is manual-dispatch only.
