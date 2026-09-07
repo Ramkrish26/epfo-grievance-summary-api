@@ -116,14 +116,15 @@ resource "aws_lambda_function" "this" {
   }
 
   environment {
-    variables = {
-      ASPNETCORE_ENVIRONMENT  = var.environment == "prd" ? "Production" : "Development"
-      Database__SecretArn     = var.db_secret_arn
-      Database__Endpoint      = var.db_endpoint
-      Database__Port          = tostring(var.db_port)
-      Database__Name          = var.db_name
-      Cors__AllowedOrigins__0 = length(var.cors_allowed_origins) > 0 ? var.cors_allowed_origins[0] : ""
-    }
+    variables = merge({
+      ASPNETCORE_ENVIRONMENT = var.environment == "prd" ? "Production" : "Development"
+      Database__SecretArn    = var.db_secret_arn
+      Database__Endpoint     = var.db_endpoint
+      Database__Port         = tostring(var.db_port)
+      Database__Name         = var.db_name
+      }, {
+      for index, origin in var.cors_allowed_origins : "Cors__AllowedOrigins__${index}" => origin
+    })
   }
 
   depends_on = [aws_cloudwatch_log_group.this]

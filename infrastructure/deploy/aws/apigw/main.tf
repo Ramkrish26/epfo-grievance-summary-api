@@ -32,7 +32,7 @@ locals {
           responseParameters = {
             "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
             "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD'"
-            "method.response.header.Access-Control-Allow-Origin"  = "'${var.cors_allowed_origin}'"
+            "method.response.header.Access-Control-Allow-Origin"  = "'*'"
           }
         }
       }

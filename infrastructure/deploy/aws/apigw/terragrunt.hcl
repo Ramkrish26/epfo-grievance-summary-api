@@ -28,6 +28,5 @@ inputs = {
   lambda_arn                  = dependency.lambda.outputs.lambda_arn
   lambda_invoke_arn           = dependency.lambda.outputs.lambda_invoke_arn
   lambda_function_name        = dependency.lambda.outputs.lambda_function_name
-  cors_allowed_origin         = local.values.cors_allowed_origins[0]
   tags                        = local.values.tags
 }
