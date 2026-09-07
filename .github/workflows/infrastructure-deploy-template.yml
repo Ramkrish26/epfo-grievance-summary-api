@@ -134,7 +134,7 @@ jobs:
         if: inputs.apply
         working-directory: infrastructure/deploy/aws/lambda
         run: |
-          terragrunt init --non-interactive
+          terragrunt init --non-interactive -upgrade
           terragrunt apply --non-interactive -auto-approve \
             --target=aws_s3_bucket.packages \
             --target=aws_s3_bucket_versioning.packages \
@@ -169,7 +169,7 @@ jobs:
           }
           trap 'result=$?; cleanup; cleanup_result=$?; if [[ $result -ne 0 ]]; then exit $result; fi; exit $cleanup_result' EXIT
 
-          terragrunt init --non-interactive
+          terragrunt init --non-interactive -upgrade
           terragrunt apply --non-interactive -auto-approve
           function_name="$(terragrunt output --non-interactive -raw function_name)"
           invoke_metadata="$(aws lambda invoke --function-name "${function_name}" --cli-binary-format raw-in-base64-out --payload "{\"requestedBy\":\"${GITHUB_REPOSITORY}@${GITHUB_SHA}\"}" migration-response.json --output json)"
