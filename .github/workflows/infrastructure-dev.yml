@@ -1,0 +1,17 @@
+name: Deploy infrastructure - dev
+
+on:
+  push:
+    branches: [develop]
+    paths: ["infrastructure/**", ".github/workflows/**", "src/**", "Epfo.Grievance.sln"]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/infrastructure-deploy-template.yml
+    with:
+      environment: dev
+      region: ap-south-1
+      apply: true
+    secrets:
+      aws_role_arn: ${{ secrets.AWS_DEV_DEPLOY_ROLE_ARN }}

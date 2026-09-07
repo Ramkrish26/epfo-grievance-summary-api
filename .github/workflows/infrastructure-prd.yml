@@ -1,0 +1,14 @@
+name: Deploy infrastructure - production
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/infrastructure-deploy-template.yml
+    with:
+      environment: prd
+      region: ap-south-1
+      apply: true
+    secrets:
+      aws_role_arn: ${{ secrets.AWS_PRD_DEPLOY_ROLE_ARN }}

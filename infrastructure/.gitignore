@@ -1,0 +1,10 @@
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terragrunt-cache/
+# Generated from deploy/aws/root.hcl by Terragrunt.
+**/provider.tf
+crash.log
+*.zip

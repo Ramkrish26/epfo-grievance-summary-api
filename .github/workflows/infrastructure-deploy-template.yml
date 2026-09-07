@@ -1,0 +1,115 @@
+name: Reusable infrastructure deployment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      region:
+        required: true
+        type: string
+      apply:
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      aws_role_arn:
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.environment }} infrastructure
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: epfo-infra-${{ inputs.environment }}
+      cancel-in-progress: false
+    env:
+      AWS_REGION: ${{ inputs.region }}
+      DEPLOY_ENV: ${{ inputs.environment }}
+      EPFO_GITHUB_REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read artifact bucket configuration
+        id: artifact-bucket
+        run: |
+          bucket_name="$(jq -r '.artifact_bucket_name' "infrastructure/deploy/aws/env/${DEPLOY_ENV}/${DEPLOY_ENV}.tfvars.json")"
+          test -n "${bucket_name}" && test "${bucket_name}" != "null"
+          echo "name=${bucket_name}" >> "$GITHUB_OUTPUT"
+      - name: Configure target-account credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.aws_role_arn }}
+          aws-region: ${{ inputs.region }}
+          role-session-name: epfo-infra-${{ inputs.environment }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Install Terragrunt
+        run: |
+          curl --fail --location --silent --show-error --output /usr/local/bin/terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v0.68.14/terragrunt_linux_amd64
+          chmod +x /usr/local/bin/terragrunt
+          terragrunt --version
+      - name: Bootstrap remote state, artifact bucket, and target-account deployment role
+        working-directory: infrastructure/deploy/aws/static
+        run: terragrunt --terragrunt-non-interactive init && terragrunt --terragrunt-non-interactive apply --auto-approve
+      - name: Deploy VPC and database prerequisites
+        if: inputs.apply
+        working-directory: infrastructure/deploy/aws
+        run: terragrunt --terragrunt-non-interactive run-all apply --auto-approve --terragrunt-exclude-dir static --terragrunt-exclude-dir lambda --terragrunt-exclude-dir apigw
+      - name: Create Lambda package bucket
+        if: inputs.apply
+        working-directory: infrastructure/deploy/aws/lambda
+        run: |
+          terragrunt --terragrunt-non-interactive init
+          terragrunt --terragrunt-non-interactive apply --auto-approve \
+            --target=aws_s3_bucket.packages \
+            --target=aws_s3_bucket_versioning.packages \
+            --target=aws_s3_bucket_server_side_encryption_configuration.packages \
+            --target=aws_s3_bucket_public_access_block.packages \
+            --target=aws_s3_bucket_policy.packages_tls
+          echo "LAMBDA_PACKAGE_BUCKET=$(terragrunt output -raw package_bucket_name)" >> "$GITHUB_ENV"
+      - name: Build .NET Lambda package
+        if: inputs.apply
+        run: |
+          rm -rf package
+          mkdir -p package/publish
+          dotnet restore Epfo.Grievance.sln
+          dotnet test Epfo.Grievance.sln --no-restore --configuration Release
+          dotnet publish src/Epfo.Grievance.Api/Epfo.Grievance.Api.csproj --configuration Release --no-restore --runtime linux-x64 --self-contained false --output package/publish
+          (cd package/publish && zip -r ../lambda.zip .)
+      - name: Generate OpenAPI and upload deployment packages
+        if: inputs.apply
+        env:
+          ASPNETCORE_URLS: http://127.0.0.1:5080
+          ASPNETCORE_ENVIRONMENT: Development
+        run: |
+          dotnet package/publish/Epfo.Grievance.Api.dll > package/api.log 2>&1 &
+          for attempt in {1..20}; do curl --fail --silent http://127.0.0.1:5080/openapi/v1.json -o package/swagger.json && break; sleep 1; done
+          test -s package/swagger.json
+          aws s3 cp package/lambda.zip "s3://${LAMBDA_PACKAGE_BUCKET}/api/${DEPLOY_ENV}/lambda.zip"
+          LAMBDA_PACKAGE_VERSION="$(aws s3api head-object --bucket "${LAMBDA_PACKAGE_BUCKET}" --key "api/${DEPLOY_ENV}/lambda.zip" --query VersionId --output text)"
+          echo "LAMBDA_PACKAGE_VERSION=${LAMBDA_PACKAGE_VERSION}" >> "$GITHUB_ENV"
+          aws s3 cp package/swagger.json "s3://${{ steps.artifact-bucket.outputs.name }}/api/${DEPLOY_ENV}/swagger.json" --content-type application/json
+      - name: Preserve Lambda package
+        if: inputs.apply
+        uses: actions/upload-artifact@v4
+        with:
+          name: epfo-lambda-${{ inputs.environment }}
+          path: package/
+      - name: Plan environment
+        working-directory: infrastructure/deploy/aws
+        run: terragrunt --terragrunt-non-interactive run-all plan --terragrunt-exclude-dir static
+      - name: Apply environment
+        if: inputs.apply
+        working-directory: infrastructure/deploy/aws
+        run: terragrunt --terragrunt-non-interactive run-all apply --auto-approve --terragrunt-exclude-dir static

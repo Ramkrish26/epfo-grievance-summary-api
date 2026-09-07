@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup><ProjectReference Include="..\Epfo.Grievance.Application\Epfo.Grievance.Application.csproj" /><ProjectReference Include="..\Epfo.Grievance.Infrastructure\Epfo.Grievance.Infrastructure.csproj" /></ItemGroup>
+  <ItemGroup><PackageReference Include="Amazon.Lambda.AspNetCoreServer.Hosting" Version="2.2.1" /><PackageReference Include="AWSSDK.SecretsManager" Version="4.0.100.12" /><PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" /><PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" /></ItemGroup>
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><DefaultItemExcludes>$(DefaultItemExcludes);artifacts\**</DefaultItemExcludes></PropertyGroup>
+</Project>
