@@ -122,6 +122,15 @@ resource "aws_vpc_security_group_egress_rule" "lambda_dns_tcp" {
   description       = "VPC DNS"
 }
 
+resource "aws_vpc_security_group_egress_rule" "lambda_secretsmanager" {
+  security_group_id            = aws_security_group.lambda.id
+  referenced_security_group_id = aws_security_group.interface_endpoint.id
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
+  description                  = "HTTPS to the Secrets Manager VPC endpoint"
+}
+
 resource "aws_vpc_security_group_ingress_rule" "rds_lambda" {
   security_group_id            = aws_security_group.rds.id
   referenced_security_group_id = aws_security_group.lambda.id
