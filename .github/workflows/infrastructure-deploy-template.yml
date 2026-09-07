@@ -66,7 +66,25 @@ jobs:
         if: inputs.apply
         working-directory: infrastructure/deploy/aws
         run: terragrunt --terragrunt-non-interactive run-all apply --auto-approve --terragrunt-exclude-dir static --terragrunt-exclude-dir lambda --terragrunt-exclude-dir apigw
-      - name: Create Lambda package bucket
+      - name: Build .NET Lambda package
+        if: inputs.apply
+        run: |
+          rm -rf package
+          mkdir -p package/publish
+          dotnet restore Epfo.Grievance.sln
+          dotnet test Epfo.Grievance.sln --no-restore --configuration Release
+          dotnet publish src/Epfo.Grievance.Api/Epfo.Grievance.Api.csproj --configuration Release --no-restore --runtime linux-x64 --self-contained false --output package/publish
+          (cd package/publish && zip -r ../lambda.zip .)
+      - name: Generate OpenAPI document
+        if: inputs.apply
+        env:
+          ASPNETCORE_URLS: http://127.0.0.1:5080
+          ASPNETCORE_ENVIRONMENT: Development
+        run: |
+          dotnet package/publish/Epfo.Grievance.Api.dll > package/api.log 2>&1 &
+          for attempt in {1..20}; do curl --fail --silent http://127.0.0.1:5080/openapi/v1.json -o package/swagger.json && break; sleep 1; done
+          test -s package/swagger.json
+      - name: Create Lambda package bucket and upload deployment artifacts
         if: inputs.apply
         working-directory: infrastructure/deploy/aws/lambda
         run: |
@@ -77,36 +95,11 @@ jobs:
             --target=aws_s3_bucket_server_side_encryption_configuration.packages \
             --target=aws_s3_bucket_public_access_block.packages \
             --target=aws_s3_bucket_policy.packages_tls
-          echo "LAMBDA_PACKAGE_BUCKET=$(terragrunt output -raw package_bucket_name)" >> "$GITHUB_ENV"
-      - name: Build .NET Lambda package
-        if: inputs.apply
-        run: |
-          rm -rf package
-          mkdir -p package/publish
-          dotnet restore Epfo.Grievance.sln --runtime linux-x64
-          dotnet test Epfo.Grievance.sln --no-restore --configuration Release
-          dotnet publish src/Epfo.Grievance.Api/Epfo.Grievance.Api.csproj --configuration Release --no-restore --runtime linux-x64 --self-contained false --output package/publish
-          (cd package/publish && zip -r ../lambda.zip .)
-      - name: Generate OpenAPI and upload deployment packages
-        if: inputs.apply
-        env:
-          ASPNETCORE_URLS: http://127.0.0.1:5080
-          ASPNETCORE_ENVIRONMENT: Development
-          Jwt__Key: epfo-ci-openapi-generation-key-do-not-use-for-auth
-        run: |
-          dotnet package/publish/Epfo.Grievance.Api.dll > package/api.log 2>&1 &
-          for attempt in {1..20}; do curl --fail --silent http://127.0.0.1:5080/openapi/v1.json -o package/swagger.json && break; sleep 1; done
-          test -s package/swagger.json
-          aws s3 cp package/lambda.zip "s3://${LAMBDA_PACKAGE_BUCKET}/api/${DEPLOY_ENV}/lambda.zip"
+          LAMBDA_PACKAGE_BUCKET="$(terragrunt output -raw package_bucket_name)"
+          aws s3 cp "$GITHUB_WORKSPACE/package/lambda.zip" "s3://${LAMBDA_PACKAGE_BUCKET}/api/${DEPLOY_ENV}/lambda.zip"
           LAMBDA_PACKAGE_VERSION="$(aws s3api head-object --bucket "${LAMBDA_PACKAGE_BUCKET}" --key "api/${DEPLOY_ENV}/lambda.zip" --query VersionId --output text)"
           echo "LAMBDA_PACKAGE_VERSION=${LAMBDA_PACKAGE_VERSION}" >> "$GITHUB_ENV"
-          aws s3 cp package/swagger.json "s3://${{ steps.artifact-bucket.outputs.name }}/api/${DEPLOY_ENV}/swagger.json" --content-type application/json
-      - name: Preserve Lambda package
-        if: inputs.apply
-        uses: actions/upload-artifact@v4
-        with:
-          name: epfo-lambda-${{ inputs.environment }}
-          path: package/
+          aws s3 cp "$GITHUB_WORKSPACE/package/swagger.json" "s3://${{ steps.artifact-bucket.outputs.name }}/api/${DEPLOY_ENV}/swagger.json" --content-type application/json
       - name: Plan environment
         working-directory: infrastructure/deploy/aws
         run: terragrunt --terragrunt-non-interactive run-all plan --terragrunt-exclude-dir static

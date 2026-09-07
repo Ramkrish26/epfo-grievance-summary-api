@@ -34,6 +34,7 @@ existing account-admin identity for this one-time command in each account:
 
 ```powershell
 $env:AWS_REGION = "ap-south-1"
+$env:EPFO_GITHUB_REPOSITORY = "Ramkrish26/epfo-grievance-summary-api"
 Set-Location infrastructure/deploy/aws/static
 $env:DEPLOY_ENV = "dev"
 terragrunt --non-interactive init
@@ -44,7 +45,18 @@ The commands above use PowerShell syntax. In Command Prompt, set the variables
 with `set DEPLOY_ENV=dev` before running Terragrunt. The artifact bucket name
 is read from the environment tfvars file: `epfo-grievance-summary-dev-artifacts`
 for dev and `epfo-grievance-summary-prd-artifacts` for production. The GitHub
-repository is configured in `infrastructure/deploy/aws/static/terragrunt.hcl`.
+repository is supplied through `EPFO_GITHUB_REPOSITORY`.
+
+The deployment role trust policy uses GitHub's immutable owner and repository
+IDs from the environment tfvars files. It permits only the matching GitHub
+environment: `repo:Ramkrish26@39208833/epfo-grievance-summary-api@1358069775:environment:dev`
+in the development account and the equivalent `:environment:prd` subject in
+production.
+
+If the GitHub OIDC provider was created manually, set its ARN as
+`github_oidc_provider_arn` in that environment's tfvars file. This prevents
+Terraform from attempting to create a duplicate provider. The development
+configuration already references the provider in account `173291123230`.
 
 Repeat for `prd`, changing the environment suffix. Store the emitted
 `deployment_role_arn` in the appropriate GitHub secret afterwards.
@@ -79,8 +91,9 @@ following for the selected environment:
 
 The dev workflow runs automatically for changes to `infrastructure/`, `.github/workflows/`,
 `src/`, or `Epfo.Grievance.sln`. The production workflow is manual-dispatch only.
-The separate `Package EPFO API for Lambda` workflow can package and upload the
-API artifacts without running the infrastructure deployment.
+Each deployment run builds the API, creates or confirms the Lambda package
+bucket, and uploads fresh Lambda and OpenAPI artifacts before applying Lambda
+and API Gateway resources.
 
 ## Artifact contract
 
