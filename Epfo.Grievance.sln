@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Epfo.Grievance.Infrastructu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Epfo.Grievance.Api", "src\Epfo.Grievance.Api\Epfo.Grievance.Api.csproj", "{196533A7-0498-4EEA-939B-F2B5937056E8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Epfo.Grievance.Migrations", "src\Epfo.Grievance.Migrations\Epfo.Grievance.Migrations.csproj", "{A56604E1-708B-4A9A-8442-A698A50E3D6F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -71,6 +73,18 @@ Global
 		{196533A7-0498-4EEA-939B-F2B5937056E8}.Release|x64.Build.0 = Release|Any CPU
 		{196533A7-0498-4EEA-939B-F2B5937056E8}.Release|x86.ActiveCfg = Release|Any CPU
 		{196533A7-0498-4EEA-939B-F2B5937056E8}.Release|x86.Build.0 = Release|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Debug|x64.Build.0 = Debug|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Debug|x86.Build.0 = Debug|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Release|x64.ActiveCfg = Release|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Release|x64.Build.0 = Release|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Release|x86.ActiveCfg = Release|Any CPU
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -80,5 +94,6 @@ Global
 		{BA50FBA8-56A1-41FF-9037-B750DE83AF52} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{1FBED32D-5F46-475A-8445-283E0FEBF5C2} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{196533A7-0498-4EEA-939B-F2B5937056E8} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{A56604E1-708B-4A9A-8442-A698A50E3D6F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

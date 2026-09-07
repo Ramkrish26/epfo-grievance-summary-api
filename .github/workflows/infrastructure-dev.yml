@@ -3,8 +3,14 @@ name: Deploy infrastructure - dev
 on:
   push:
     branches: [develop]
-    paths: ["infrastructure/**", ".github/workflows/**", "src/**", "Epfo.Grievance.sln"]
+    paths: ["infrastructure/**", ".github/workflows/**", "src/**", "database/**", "Epfo.Grievance.sln"]
   workflow_dispatch:
+    inputs:
+      force_migrations:
+        description: Run all unrecorded database migrations (use only for an initial migration or recovery)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -17,5 +23,6 @@ jobs:
       environment: dev
       region: ap-south-1
       apply: true
+      force_migrations: ${{ github.event_name == 'workflow_dispatch' && inputs.force_migrations || false }}
     secrets:
       aws_role_arn: ${{ secrets.AWS_DEV_DEPLOY_ROLE_ARN }}

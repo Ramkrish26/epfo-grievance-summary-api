@@ -85,8 +85,10 @@ following for the selected environment:
 1. Deploys the VPC and RDS prerequisites.
 2. Creates the Lambda package bucket.
 3. Restores, tests, and publishes the .NET 10 API for `linux-x64`.
-4. Uploads `lambda.zip` and the generated OpenAPI document.
-5. Plans and applies the remaining Lambda and API Gateway resources.
+4. When a new SQL migration file is added, packages and invokes a temporary
+   VPC migration Lambda, then destroys it regardless of success or failure.
+5. Uploads `lambda.zip` and the generated OpenAPI document.
+6. Plans and applies the remaining Lambda and API Gateway resources.
 
 The dev workflow runs automatically for changes to `infrastructure/`, `.github/workflows/`,
 `src/`, or `Epfo.Grievance.sln`. The production workflow is manual-dispatch only.
@@ -108,13 +110,14 @@ This sequence is automated before the Lambda and API Gateway deployment.
 
 Amazon RDS for SQL Server does not provide an initial-database setting. The
 instance's generated master secret is injected into Lambda at deployment time.
-After RDS is available, run the scripts in `database/` in numeric order from a
-private-network SQL Server client or deployment job to create the
-`EpfoGrievance` database and schema. For an existing database, run
-`003_AddAdminRole.sql` and then `005_FeatureCompletion.sql` as described in
-`database/README.md`. Edit the placeholders in `004_SeedInitialSuperAdmin.sql`
-before running it. Do not place a database password in a tfvars file or GitHub
-secret.
+After RDS is available, the deployment pipeline detects newly added
+`database/*.sql` files and runs them in numeric order through a temporary
+Lambda in the private app subnets. The Lambda records every successful version
+and SHA-256 hash in `dbo.__EpfoSchemaMigrations`, skips identical previously
+applied scripts, and rejects changed historical scripts. It is destroyed after
+the invocation regardless of its result. `004_SeedInitialSuperAdmin.sql` is
+manual-only; edit its placeholders and run it through a controlled SQL session.
+Do not place a database password in a tfvars file or GitHub secret.
 
 ## Environment configuration
 
