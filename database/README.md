@@ -24,9 +24,9 @@ each filename and SHA-256 hash in `dbo.__EpfoSchemaMigrations`. A script that is
 already recorded with the same hash is skipped. Changing an already-recorded
 script causes a failure; add a new, higher-numbered file instead.
 
-`004_SeedInitialSuperAdmin.sql` is explicitly manual-only and is never run by
-the pipeline. Edit its placeholders and execute it through a controlled SQL
-session when creating the first Super Admin.
+`004_SeedInitialSuperAdmin.sql` is run by the migration pipeline like the other
+versioned scripts. Edit its placeholders before dispatching the initial
+migration run when creating the first Super Admin.
 
 The migration Lambda is created only when a new `database/*.sql` file is added
 to a push. It is invoked after RDS is ready and destroyed after either a

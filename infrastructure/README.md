@@ -115,8 +115,8 @@ After RDS is available, the deployment pipeline detects newly added
 Lambda in the private app subnets. The Lambda records every successful version
 and SHA-256 hash in `dbo.__EpfoSchemaMigrations`, skips identical previously
 applied scripts, and rejects changed historical scripts. It is destroyed after
-the invocation regardless of its result. `004_SeedInitialSuperAdmin.sql` is
-manual-only; edit its placeholders and run it through a controlled SQL session.
+the invocation regardless of its result. Edit the placeholders in
+`004_SeedInitialSuperAdmin.sql` before dispatching the initial migration run.
 Do not place a database password in a tfvars file or GitHub secret.
 
 ## Environment configuration

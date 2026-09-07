@@ -16,7 +16,6 @@ namespace Epfo.Grievance.Migrations;
 public sealed class Function
 {
     private static readonly Regex GoBatchSeparator = new("^\\s*GO\\s*;?\\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-    private static readonly HashSet<string> ManualOnlyMigrationIds = new(StringComparer.OrdinalIgnoreCase) { "004_SeedInitialSuperAdmin.sql" };
 
     public async Task<MigrationResult> FunctionHandler(MigrationRequest? request, ILambdaContext context)
     {
@@ -38,13 +37,6 @@ public sealed class Function
 
             foreach (var script in ReadEmbeddedScripts())
             {
-                if (ManualOnlyMigrationIds.Contains(script.MigrationId))
-                {
-                    context.Logger.LogInformation($"Skipping manual-only migration {script.MigrationId}.");
-                    skipped.Add($"{script.MigrationId} (manual)");
-                    continue;
-                }
-
                 var recordedHash = await GetRecordedHashAsync(connection, script.MigrationId);
                 if (recordedHash is not null)
                 {
